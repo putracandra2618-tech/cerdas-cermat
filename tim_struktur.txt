@@ -1,0 +1,25 @@
+                         ┌─── Tim A
+                 ┌───────┤
+                 │       ├─── Tim B
+                 │       │
+                 │       └─── Tim C
+           ┌─────┤   (Lolos: A/B/C)
+           │
+           │
+           │         ┌─── Tim D
+           │   ┌─────┤
+           │   │     ├─── Tim E
+           │   │     │
+           │   │     └─── Tim F
+PENYISIHAN ├───┤   (Lolos: D/E/F)
+           │
+           │
+           │         ┌─── Tim G
+           │   ┌─────┤
+           │   │     ├─── Tim H
+           │   │     │
+           │   │     └─── Tim I
+           └───┤   (Lolos: G/H/I)
+               │
+               │
+               └──> ***MASUK PEREMPAT FINAL***
