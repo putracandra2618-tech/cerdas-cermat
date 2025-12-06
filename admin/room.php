@@ -24,19 +24,54 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     $room_id = (int) $room['id'];
 
-    if ($action === 'start_match') {
-        query("UPDATE rooms SET status = 'running' WHERE id = $room_id");
+    if ($action === 'set_category') {
+        // Set question category for this room
+        $category = escape($_POST['category']);
+
+        // Get total questions in this category
+        $total_questions = fetch_single("SELECT COUNT(*) as count FROM questions WHERE category = '$category'")['count'];
+
+        if ($total_questions == 0) {
+            redirect('/admin/room.php?code=' . $code . '&error=no_questions');
+        }
+
+        // Set category and start match
+        query("UPDATE rooms SET 
+               question_set_category = '$category',
+               current_question_index = 0,
+               status = 'running' 
+               WHERE id = $room_id");
         query("UPDATE matches SET status = 'running' WHERE id = " . $room['match_id']);
+
         redirect('/admin/room.php?code=' . $code);
-    } elseif ($action === 'set_question') {
-        $question_id = (int) $_POST['question_id'];
+    } elseif ($action === 'start_question') {
+        // Auto-load next question based on category and index
+        $category = $room['question_set_category'];
+        $current_index = (int) $room['current_question_index'];
+
+        // Get question by category and index
+        $question = fetch_single("
+            SELECT id FROM questions 
+            WHERE category = '$category' 
+            ORDER BY id ASC 
+            LIMIT $current_index, 1
+        ");
+
+        if (!$question) {
+            // No more questions, finish match automatically
+            redirect('/admin/room.php?code=' . $code . '&action_post=finish_match');
+        }
+
+        $question_id = $question['id'];
         $start_time = get_microtime();
+
         query("UPDATE rooms SET 
                current_question_id = $question_id,
                current_phase = 'countdown',
                question_start_time = $start_time,
                countdown_value = 3
                WHERE id = $room_id");
+
         redirect('/admin/room.php?code=' . $code . '&phase=countdown');
     } elseif ($action === 'open_buzzer') {
         query("UPDATE rooms SET current_phase = 'buzzer' WHERE id = $room_id");
@@ -92,11 +127,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         query("UPDATE rooms SET current_phase = 'result' WHERE id = $room_id");
         redirect('/admin/room.php?code=' . $code . '&phase=result');
     } elseif ($action === 'next_question') {
+        // Increment index and reset to idle
+        $new_index = (int) $room['current_question_index'] + 1;
+
         query("UPDATE rooms SET 
                current_question_id = NULL,
                current_phase = 'idle',
-               question_start_time = NULL
+               question_start_time = NULL,
+               current_question_index = $new_index
                WHERE id = $room_id");
+
         redirect('/admin/room.php?code=' . $code);
     } elseif ($action === 'finish_match') {
         query("UPDATE rooms SET status = 'finished' WHERE id = $room_id");
@@ -118,6 +158,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// Check if auto-finish needed
+if (isset($_GET['action_post']) && $_GET['action_post'] === 'finish_match') {
+    // Auto-finish because no more questions
+    query("UPDATE rooms SET status = 'finished' WHERE id = " . $room['id']);
+    query("UPDATE matches SET status = 'finished' WHERE id = " . $room['match_id']);
+
+    $winner = fetch_single("
+        SELECT team_id FROM scores 
+        WHERE room_id = " . $room['id'] . " 
+        ORDER BY total_points DESC, correct_answers DESC 
+        LIMIT 1
+    ");
+
+    if ($winner) {
+        query("UPDATE matches SET winner_team_id = " . $winner['team_id'] . " WHERE id = " . $room['match_id']);
+    }
+
+    redirect('/admin/room.php?code=' . $code . '&finished=1&auto=1');
+}
+
+
 // Get participants
 $participants = fetch_all("
     SELECT rp.*, t.name as team_name
@@ -128,13 +189,26 @@ $participants = fetch_all("
 ");
 
 // Get all questions for dropdown
-$questions = fetch_all("SELECT id, question_text, category FROM questions ORDER BY id ASC");
+$questions = fetch_all("SELECT id, question_text, category FROM questions ORDER BY category ASC, id ASC");
+
+// Get unique categories
+$categories = fetch_all("SELECT DISTINCT category FROM questions ORDER BY category ASC");
 
 // Get current question if exists
 $current_question = null;
 if ($room['current_question_id']) {
     $current_question = fetch_single("SELECT * FROM questions WHERE id = " . $room['current_question_id']);
 }
+
+// Get total questions in current category
+$total_questions_in_category = 0;
+if ($room['question_set_category']) {
+    $total_questions_in_category = fetch_single("
+        SELECT COUNT(*) as count FROM questions 
+        WHERE category = '" . escape($room['question_set_category']) . "'
+    ")['count'];
+}
+
 
 // Get buzzer ranking for current question
 $buzzer_ranking = [];
@@ -170,7 +244,7 @@ $scores = fetch_all("
     ORDER BY s.total_points DESC, s.correct_answers DESC
 ");
 ?>
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html lang="id">
 
 <head>
@@ -214,6 +288,16 @@ $scores = fetch_all("
             <div class="alert alert-success">
                 <strong>✅ Pertandingan Selesai!</strong>
                 <br>Pemenang telah ditentukan. Lihat skor final di bawah.
+                <?php if (isset($_GET['auto'])): ?>
+                    <br><small>Pertandingan selesai otomatis karena semua soal telah dijawab.</small>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+        
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'no_questions'): ?>
+            <div class="alert alert-error">
+                <strong>❌ Error!</strong>
+                <br>Tidak ada soal dalam kategori yang dipilih. Silakan tambah soal terlebih dahulu.
             </div>
         <?php endif; ?>
 
@@ -261,7 +345,18 @@ $scores = fetch_all("
 
                     <?php if ($room['status'] === 'waiting'): ?>
                         <form method="POST" action="">
-                            <input type="hidden" name="action" value="start_match">
+                            <input type="hidden" name="action" value="set_category">
+                            <div class="form-group">
+                                <label>Pilih Kategori Soal:</label>
+                                <select name="category" required class="form-control">
+                                    <option value="">-- Pilih Kategori --</option>
+                                    <?php foreach ($categories as $cat): ?>
+                                        <option value="<?= htmlspecialchars($cat['category']) ?>">
+                                            <?= htmlspecialchars($cat['category']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
                             <button type="submit" class="btn btn-success btn-block" <?= count($participants) < 2 ? 'disabled' : '' ?>>
                                 ▶️ Mulai Pertandingan
                             </button>
@@ -271,27 +366,32 @@ $scores = fetch_all("
                         <?php endif; ?>
                     <?php endif; ?>
 
-                    <?php if ($room['status'] === 'running' && $room['current_phase'] === 'idle'): ?>
-                        <form method="POST" action="">
-                            <input type="hidden" name="action" value="set_question">
-                            <div class="form-group">
-                                <label>Pilih Soal:</label>
-                                <select name="question_id" required class="form-control">
-                                    <option value="">-- Pilih Soal --</option>
-                                    <?php foreach ($questions as $q): ?>
-                                        <option value="<?= $q['id'] ?>">
-                                            #<?= $q['id'] ?> - <?= htmlspecialchars(substr($q['question_text'], 0, 50)) ?>...
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <button type="submit" class="btn btn-primary btn-block">
-                                🎯 Mulai Soal
-                            </button>
-                        </form>
-                    <?php endif; ?>
-
                     <?php if ($room['status'] === 'running'): ?>
+                        <!-- Progress Info -->
+                        <?php if ($room['question_set_category']): ?>
+                            <div class="progress-info" style="background: #f0f9ff; padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                                <div style="font-size: 0.875rem; color: #64748b;">Kategori:</div>
+                                <div style="font-weight: bold; color: #2563eb; font-size: 1.125rem;">
+                                    <?= htmlspecialchars($room['question_set_category']) ?>
+                                </div>
+                                <div style="margin-top: 0.5rem; font-size: 0.875rem;">
+                                    Soal ke-<?= ($room['current_question_index'] + 1) ?> dari <?= $total_questions_in_category ?>
+                                </div>
+                                <div class="progress-bar" style="background: #e2e8f0; height: 8px; border-radius: 4px; margin-top: 0.5rem; overflow: hidden;">
+                                    <div style="background: #2563eb; height: 100%; width: <?= ($total_questions_in_category > 0) ? (($room['current_question_index'] / $total_questions_in_category) * 100) : 0 ?>%;"></div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        
+                        <?php if ($room['current_phase'] === 'idle'): ?>
+                            <form method="POST" action="">
+                                <input type="hidden" name="action" value="start_question">
+                                <button type="submit" class="btn btn-primary btn-block btn-large">
+                                    🎯 Mulai Soal #<?= ($room['current_question_index'] + 1) ?>
+                                </button>
+                            </form>
+                        <?php endif; ?>
+                        
                         <form method="POST" action="" style="margin-top: 10px;">
                             <input type="hidden" name="action" value="finish_match">
                             <button type="submit" class="btn btn-danger btn-block"
@@ -315,7 +415,7 @@ $scores = fetch_all("
                     <div class="display-countdown">
                         <h1>Bersiap-siap!</h1>
                         <div class="countdown-number" id="countdownDisplay">3</div>
-                        <p>Soal akan dimulai...</p>
+                        <p>Soal akan dimula...</p>
                     </div>
 
                     <script>
@@ -339,6 +439,22 @@ $scores = fetch_all("
 
                 <?php elseif ($room['current_phase'] === 'buzzer'): ?>
                     <div class="display-buzzer">
+                        <!-- Question Display -->
+                        <?php if ($current_question): ?>
+                            <div class="question-preview">
+                                <h2 class="question-text-buzzer"><?= htmlspecialchars($current_question['question_text']) ?>
+                                </h2>
+                                <div class="options-preview">
+                                    <div class="option-preview">A. <?= htmlspecialchars($current_question['option_a']) ?></div>
+                                    <div class="option-preview">B. <?= htmlspecialchars($current_question['option_b']) ?></div>
+                                    <div class="option-preview">C. <?= htmlspecialchars($current_question['option_c']) ?></div>
+                                    <div class="option-preview">D. <?= htmlspecialchars($current_question['option_d']) ?></div>
+                                    <div class="option-preview">E. <?= htmlspecialchars($current_question['option_e']) ?></div>
+                                </div>
+                            </div>
+                            <hr style="margin: 2rem 0; border: 2px solid #e2e8f0;">
+                        <?php endif; ?>
+
                         <h1>🔔 BUZZER TERBUKA!</h1>
                         <p class="buzzer-instruction">Peserta: Tekan SPASI sekarang!</p>
 
@@ -360,7 +476,7 @@ $scores = fetch_all("
                         <form method="POST" action="" style="margin-top: 20px;">
                             <input type="hidden" name="action" value="close_buzzer">
                             <button type="submit" class="btn btn-warning btn-large">
-                                🔒 Tutup Buzzer & Buka Jawaban
+                                🔒 Tutup Buzzer
                             </button>
                         </form>
                     </div>

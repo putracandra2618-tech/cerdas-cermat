@@ -82,9 +82,6 @@
         <p class="subtitle">Sistem Lomba Cerdas Cermat Berbasis Buzzer</p>
 
         <div class="buttons-container">
-            <a href="/admin/login.php" class="landing-btn admin">
-                👨‍💼 Masuk sebagai Panitia
-            </a>
             <a href="/participant/join.php" class="landing-btn">
                 👥 Gabung sebagai Peserta
             </a>

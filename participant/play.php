@@ -79,6 +79,30 @@ $my_score = fetch_single("SELECT * FROM scores WHERE room_id = $room_id AND team
                 <p>Panitia akan segera memilih soal</p>
             </div>
 
+            <script>
+                    // Poll for phase change every 500ms
+                    const pollInterval = setInterval(() => {
+                        fetch('/api/room_status.php?room_id=<?= $room_id ?>')
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    console.log('Phase:', data.data.current_phase);
+                                    // Reload if phase changed from idle
+                                    if (data.data.current_phase && data.data.current_phase !== 'idle') {
+                                        clearInterval(pollInterval);
+                                        location.reload();
+                                    }
+                                    // Check if match finished
+                                    if (data.data.status === 'finished') {
+                                        clearInterval(pollInterval);
+                                        window.location.href = '/participant/finished.php';
+                                    }
+                                }
+                            })
+                            .catch(error => console.error('Polling error:', error));
+                    }, 500);
+                </script>
+
         <?php elseif ($room['current_phase'] === 'countdown'): ?>
             <div class="play-countdown">
                 <h1>Bersiap!</h1>

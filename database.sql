@@ -68,6 +68,8 @@ CREATE TABLE rooms (
     code VARCHAR(20) NOT NULL UNIQUE,
     status ENUM('waiting', 'running', 'finished') DEFAULT 'waiting',
     current_question_id INT DEFAULT NULL,
+    current_question_index INT DEFAULT 0,
+    question_set_category VARCHAR(50) DEFAULT NULL,
     current_phase ENUM('countdown', 'buzzer', 'answer', 'result', 'idle') DEFAULT 'idle',
     countdown_value INT DEFAULT 3,
     question_start_time DECIMAL(16,4) DEFAULT NULL,

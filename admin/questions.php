@@ -59,6 +59,48 @@ $questions = fetch_all("SELECT * FROM questions ORDER BY id DESC");
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manajemen Soal - Cerdas Cermat</title>
     <link rel="stylesheet" href="/assets/css/admin.css">
+    <style>
+        /* Horizontal Scroll Container */
+        .questions-scroll-wrapper {
+            overflow-x: auto;
+            overflow-y: visible;
+            padding-bottom: 1rem;
+            margin: 0 -2rem;
+            padding-left: 2rem;
+            padding-right: 2rem;
+        }
+
+        .questions-grid {
+            display: flex;
+            gap: 1.5rem;
+            min-width: max-content;
+        }
+
+        .question-card {
+            min-width: 350px;
+            max-width: 350px;
+            flex-shrink: 0;
+        }
+
+        /* Custom Scrollbar */
+        .questions-scroll-wrapper::-webkit-scrollbar {
+            height: 8px;
+        }
+
+        .questions-scroll-wrapper::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        .questions-scroll-wrapper::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        .questions-scroll-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    </style>
 </head>
 
 <body>
@@ -83,42 +125,44 @@ $questions = fetch_all("SELECT * FROM questions ORDER BY id DESC");
             </div>
         <?php endif; ?>
 
-        <div class="questions-grid">
-            <?php foreach ($questions as $q): ?>
-                <div class="question-card">
-                    <div class="question-header">
-                        <span class="question-id">#<?= $q['id'] ?></span>
-                        <?php if ($q['category']): ?>
-                            <span class="question-category"><?= htmlspecialchars($q['category']) ?></span>
-                        <?php endif; ?>
+        <div class="questions-scroll-wrapper">
+            <div class="questions-grid">
+                <?php foreach ($questions as $q): ?>
+                    <div class="question-card">
+                        <div class="question-header">
+                            <span class="question-id">#<?= $q['id'] ?></span>
+                            <?php if ($q['category']): ?>
+                                <span class="question-category"><?= htmlspecialchars($q['category']) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="question-text">
+                            <?= htmlspecialchars($q['question_text']) ?>
+                        </div>
+                        <div class="question-options">
+                            <div class="option <?= $q['correct_option'] === 'A' ? 'correct' : '' ?>">
+                                <strong>A:</strong> <?= htmlspecialchars($q['option_a']) ?>
+                            </div>
+                            <div class="option <?= $q['correct_option'] === 'B' ? 'correct' : '' ?>">
+                                <strong>B:</strong> <?= htmlspecialchars($q['option_b']) ?>
+                            </div>
+                            <div class="option <?= $q['correct_option'] === 'C' ? 'correct' : '' ?>">
+                                <strong>C:</strong> <?= htmlspecialchars($q['option_c']) ?>
+                            </div>
+                            <div class="option <?= $q['correct_option'] === 'D' ? 'correct' : '' ?>">
+                                <strong>D:</strong> <?= htmlspecialchars($q['option_d']) ?>
+                            </div>
+                            <div class="option <?= $q['correct_option'] === 'E' ? 'correct' : '' ?>">
+                                <strong>E:</strong> <?= htmlspecialchars($q['option_e']) ?>
+                            </div>
+                        </div>
+                        <div class="question-actions">
+                            <button onclick='editQuestion(<?= json_encode($q) ?>)'
+                                class="btn btn-sm btn-secondary">Edit</button>
+                            <button onclick="deleteQuestion(<?= $q['id'] ?>)" class="btn btn-sm btn-danger">Hapus</button>
+                        </div>
                     </div>
-                    <div class="question-text">
-                        <?= htmlspecialchars($q['question_text']) ?>
-                    </div>
-                    <div class="question-options">
-                        <div class="option <?= $q['correct_option'] === 'A' ? 'correct' : '' ?>">
-                            <strong>A:</strong> <?= htmlspecialchars($q['option_a']) ?>
-                        </div>
-                        <div class="option <?= $q['correct_option'] === 'B' ? 'correct' : '' ?>">
-                            <strong>B:</strong> <?= htmlspecialchars($q['option_b']) ?>
-                        </div>
-                        <div class="option <?= $q['correct_option'] === 'C' ? 'correct' : '' ?>">
-                            <strong>C:</strong> <?= htmlspecialchars($q['option_c']) ?>
-                        </div>
-                        <div class="option <?= $q['correct_option'] === 'D' ? 'correct' : '' ?>">
-                            <strong>D:</strong> <?= htmlspecialchars($q['option_d']) ?>
-                        </div>
-                        <div class="option <?= $q['correct_option'] === 'E' ? 'correct' : '' ?>">
-                            <strong>E:</strong> <?= htmlspecialchars($q['option_e']) ?>
-                        </div>
-                    </div>
-                    <div class="question-actions">
-                        <button onclick='editQuestion(<?= json_encode($q) ?>)'
-                            class="btn btn-sm btn-secondary">Edit</button>
-                        <button onclick="deleteQuestion(<?= $q['id'] ?>)" class="btn btn-sm btn-danger">Hapus</button>
-                    </div>
-                </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            </div>
         </div>
     </div>
 
@@ -170,14 +214,15 @@ $questions = fetch_all("SELECT * FROM questions ORDER BY id DESC");
                 </div>
 
                 <div class="form-group">
-                    <label>Jawaban Benar *</label>
-                    <div class="radio-group">
-                        <label><input type="radio" name="correct_option" value="A" required> A</label>
-                        <label><input type="radio" name="correct_option" value="B"> B</label>
-                        <label><input type="radio" name="correct_option" value="C"> C</label>
-                        <label><input type="radio" name="correct_option" value="D"> D</label>
-                        <label><input type="radio" name="correct_option" value="E"> E</label>
-                    </div>
+                    <label for="correct_option">Jawaban Benar *</label>
+                    <select id="correct_option" name="correct_option" required>
+                        <option value="">-- Pilih Jawaban Benar --</option>
+                        <option value="A">A</option>
+                        <option value="B">B</option>
+                        <option value="C">C</option>
+                        <option value="D">D</option>
+                        <option value="E">E</option>
+                    </select>
                 </div>
 
                 <button type="submit" class="btn btn-primary">Simpan</button>
@@ -210,7 +255,7 @@ $questions = fetch_all("SELECT * FROM questions ORDER BY id DESC");
             document.getElementById('option_d').value = question.option_d;
             document.getElementById('option_e').value = question.option_e;
             document.getElementById('category').value = question.category || '';
-            document.querySelector(`input[name="correct_option"][value="${question.correct_option}"]`).checked = true;
+            document.getElementById('correct_option').value = question.correct_option;
             document.getElementById('questionModal').style.display = 'block';
         }
 

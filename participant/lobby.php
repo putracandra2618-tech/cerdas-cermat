@@ -64,19 +64,28 @@ if ($room['status'] === 'finished') {
     </div>
 
     <script>
-        // Poll room status every 1 second
-        setInterval(function () {
+        // Poll room status every 500ms for faster response
+        let pollInterval = setInterval(function () {
             fetch('/api/room_status.php?room_id=<?= $room_id ?>')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.success && data.data.status === 'running') {
-                        window.location.href = '/participant/play.php';
-                    } else if (data.success && data.data.status === 'finished') {
-                        window.location.href = '/participant/finished.php';
+                    if (data.success) {
+                        console.log('Room status:', data.data.status, 'Phase:', data.data.current_phase);
+
+                        // Redirect to play if match is running
+                        if (data.data.status === 'running') {
+                            clearInterval(pollInterval);
+                            window.location.href = '/participant/play.php';
+                        }
+                        // Redirect to finished if match ended
+                        else if (data.data.status === 'finished') {
+                            clearInterval(pollInterval);
+                            window.location.href = '/participant/finished.php';
+                        }
                     }
                 })
                 .catch(error => console.error('Error polling status:', error));
-        }, 1000);
+        }, 500);
     </script>
 </body>
 
