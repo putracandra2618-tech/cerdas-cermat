@@ -1,0 +1,22 @@
+# Apache Configuration for Cerdas Cermat
+
+# Prevent directory listing
+Options -Indexes
+
+# Protect config file
+<Files "config.php">
+    Order allow,deny
+    Deny from all
+</Files>
+
+
+# Set default charset
+AddDefaultCharset UTF-8
+
+# Enable error reporting (remove in production)
+php_flag display_errors On
+php_value error_reporting E_ALL
+
+# Increase upload limits if needed
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
