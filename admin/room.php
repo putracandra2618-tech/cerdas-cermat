@@ -562,6 +562,79 @@ $scores = fetch_all("
                         </form>
                     </div>
 
+                <?php elseif ($room['status'] === 'finished'): ?>
+                    <?php
+                    // Get winner info
+                    $winner_data = fetch_single("
+                        SELECT s.*, t.name as team_name
+                        FROM scores s
+                        JOIN teams t ON s.team_id = t.id
+                        WHERE s.room_id = " . $room['id'] . "
+                        ORDER BY s.total_points DESC, s.correct_answers DESC
+                        LIMIT 1
+                    ");
+                    ?>
+                    <div class="display-finished" style="text-align: center; padding: 3rem;">
+                        <div class="winner-announcement" style="margin-bottom: 3rem;">
+                            <h1 style="font-size: 3rem; margin-bottom: 1rem;">🏆 PEMENANG 🏆</h1>
+                            <div class="winner-card" style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); padding: 3rem; border-radius: 20px; box-shadow: 0 20px 60px rgba(251, 191, 36, 0.4); animation: winner-pulse 2s infinite;">
+                                <h2 style="font-size: 4rem; color: white; margin-bottom: 1rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">
+                                    <?= htmlspecialchars($winner_data['team_name']) ?>
+                                </h2>
+                                <div style="font-size: 5rem; font-weight: bold; color: white; margin: 1rem 0;">
+                                    <?= $winner_data['total_points'] ?> POIN
+                                </div>
+                                <div style="font-size: 1.5rem; color: rgba(255,255,255,0.9);">
+                                    ✅ <?= $winner_data['correct_answers'] ?> Benar | 
+                                    ❌ <?= $winner_data['wrong_answers'] ?> Salah
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="final-rankings" style="max-width: 800px; margin: 0 auto;">
+                            <h2 style="font-size: 2rem; margin-bottom: 2rem;">📊 Peringkat Final</h2>
+                            <?php foreach ($scores as $idx => $s): ?>
+                                <div class="ranking-final-item" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.5rem; margin-bottom: 1rem; border-radius: 12px; <?= $idx === 0 ? 'background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 3px solid #fbbf24;' : 'background: white;' ?> box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                                    <div class="rank-display" style="font-size: 2rem; font-weight: bold; color: <?= $idx === 0 ? '#f59e0b' : '#64748b' ?>; min-width: 60px; text-align: center;">
+                                        <?php if ($idx === 0): ?>
+                                            🥇
+                                        <?php elseif ($idx === 1): ?>
+                                            🥈
+                                        <?php elseif ($idx === 2): ?>
+                                            🥉
+                                        <?php else: ?>
+                                            #<?= $idx + 1 ?>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div style="flex: 1; text-align: left;">
+                                        <div style="font-size: 1.75rem; font-weight: bold; color: #0f172a;">
+                                            <?= htmlspecialchars($s['team_name']) ?>
+                                        </div>
+                                        <div style="color: #64748b; margin-top: 0.25rem;">
+                                            ✅ <?= $s['correct_answers'] ?> benar | ❌ <?= $s['wrong_answers'] ?> salah
+                                        </div>
+                                    </div>
+                                    <div style="font-size: 2.5rem; font-weight: bold; color: <?= $idx === 0 ? '#10b981' : '#2563eb' ?>;">
+                                        <?= $s['total_points'] ?> pts
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <style>
+                        @keyframes winner-pulse {
+                            0%, 100% {
+                                transform: scale(1);
+                                box-shadow: 0 20px 60px rgba(251, 191, 36, 0.4);
+                            }
+                            50% {
+                                transform: scale(1.02);
+                                box-shadow: 0 25px 80px rgba(251, 191, 36, 0.6);
+                            }
+                        }
+                    </style>
+
                 <?php else: ?>
                     <div class="display-waiting">
                         <h1>Selamat Datang!</h1>
